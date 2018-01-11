@@ -1,8 +1,10 @@
 from parsers.SSBParser import *
 from parsers.BNPParibas import *
 
+from abc import ABC
 
-class ParserFactory(object):
+
+class ParserFactory(ABC):
     global logger
     logger = logging.getLogger(__name__)
     logging.config.fileConfig('%s' % CONF_LOGGING_INI, disable_existing_loggers=False)

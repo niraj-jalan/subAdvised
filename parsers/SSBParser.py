@@ -11,7 +11,7 @@ class SSBParser(BaseParser):
     def parse(self):
         file_name = self._file_name
         config = self._config
-        ssb_purpose_code_json = config.get('SSB', 'ssb_purpose_code_json')
+        ssb_purpose_code_json = config.get('StateStreet', 'ssb_purpose_code_json')
         ssb_category_list = self.find_values('ssb_category', ssb_purpose_code_json)
 
         logger.info('SSb parser - Parse fileName - %s' % file_name)

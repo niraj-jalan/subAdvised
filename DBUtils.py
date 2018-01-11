@@ -82,11 +82,11 @@ class DBUtils:
             if columns2print is None:
                 for col in row:
                     # f.write('"%s",' % str(col))
-                    line = line + ('"%s",' % str(col)) if col is not None else  line + '"",'
+                    line = line + ('%s,' % str(col)) if col is not None else  line + '"",'
             else:
                 for index in columns2print:
                     col = row[int(index)]
-                    line = line + ('"%s",' % str(col)) if col is not None else  line + '"",'
+                    line = line + ('%s,' % str(col)) if col is not None else  line + '"",'
 
             # after all the columns, write the record to the file after removing the last comma
             line = line[:-1]
@@ -178,7 +178,7 @@ class DBUtils:
                 logger.info('Build Json Object')
                 return DBUtils.__writeJSON(data, cursor, columns2print)
             else:
-                DBUtils.__writeHeaders(data, cursor, columns2print)
+                # DBUtils.__writeHeaders(data, cursor, columns2print)
                 DBUtils.__writeData(data, cursor, columns2print)
         except pypyodbc.DatabaseError as err:
             error, = err.args
@@ -250,11 +250,32 @@ class DBUtils:
 
     @staticmethod
     def callStoredProc(config, sqlname, sqlParams):
-        conn = DBUtils.__getConnection(config)
-        procName = config.get('DB', sqlname)
-        sql = """SET NOCOUNT ON;
-             DECLARE @ret int
-             EXEC @ret = %s %s
-             SELECT @ret""" % (procName, ','.join(['?'] * len(sqlParams)))
-        logger.debug('Stored Proc Sql - %s  where params - %s' % (sql, sqlParams))
-        return int(conn.cursor().execute(sql, sqlParams).fetchone()[0])
+        ret_code = None
+        conn = None
+        cursor = None
+        procName = None
+        try:
+            conn = DBUtils.__getConnection(config)
+            procName = config.get('DB', sqlname)
+            sql = """SET NOCOUNT ON;
+                 DECLARE @ret int
+                 EXEC @ret = %s %s
+                 SELECT @ret""" % (procName, ','.join(['?'] * len(sqlParams)))
+            logger.debug('Stored Proc Sql - %s  where params - %s' % (sql, sqlParams))
+
+            cursor = conn.cursor()
+            ret_code = int(cursor.execute(sql, sqlParams).fetchone()[0])
+
+            conn.commit()
+            logger.info('DBUtils.callStoredProc statement - re_code %s' % ret_code)
+
+        except pypyodbc.DatabaseError as err:
+            # error, = err.args
+            # sys.stderr.write(err.message)
+            # logger.error(err.message)
+            raise Exception('Error while running stored proc - %s [params - %s]' % (procName, sqlParams))
+        finally:
+            DBUtils.__close_cursor(cursor)
+            DBUtils.__closeConnection(conn)
+
+        return ret_code

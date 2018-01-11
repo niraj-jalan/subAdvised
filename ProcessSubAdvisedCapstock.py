@@ -87,6 +87,15 @@ class SubAdvisedProcessor:
         processor.setConfig(os.path.join(dir, config_path))
 
         parser = ParserFactory.factory(parser_type, config)
+
+        # json_string = config.get(parser_type, 'json_properties_string')
+        params = []
+        params.append(parser_type)
+        json_string = DBUtils.select(config, 'get_parser_config', params, False)[0]
+        for k, v in json.loads(json_string).items():
+            logger.debug('JSN String parsed Properties from Database - %s - %s' % (k, v))
+            config.set(parser_type, str(k), str(v).replace('\'', '"'))
+
         return_code = 0
         # this is also the feed id
         # import_process_type = json.loads(DBUtils.select(config, 'get_sub_advised_import_process_type', None, True))[0]['import_process_type_id']
@@ -96,6 +105,7 @@ class SubAdvisedProcessor:
             logger.debug('#' * 50)
             file_success = False
             accountId = None
+
             try:
                 filename = data_dir + '\\' + file_name
                 parser._file_name = filename
@@ -110,13 +120,34 @@ class SubAdvisedProcessor:
                     accountId = parsed_records[0].account_id
                     import_process_id = None
 
-                    # rows_inserted = parser.save_to_database(parsed_records)
+                    rows_inserted = parser.save_to_database(parsed_records)
 
                     # check if config says to auto- approve. Write the code below to auto-Approve
+                    if str(accountId) in config.get(parser_type, 'auto_approve_account_list') and len(
+                            rows_inserted) > 0:
+                        logger.debug('Auto Approve is set to True for account - %s' % accountId)
+                        for row in rows_inserted:
+                            params = []
+                            params.append(row[0])
+                            params.append('BATCH')
+                            DBUtils.callStoredProc(config, 'cash_flow_update_status', params)
 
-                    # check the config for auto post to SCD
+                            # check the config for auto post to SCD
+                            if str(accountId) in config.get(parser_type, 'auto_post_to_SCD_account_list'):
+                                logger.debug('Auto Post is set to True for account - %s' % accountId)
+                                params = []
+                                params.append(row[0])
+                                params.append('20')
+                                DBUtils.callStoredProc(config, 'cash_flow_update_scd_status', params)
 
-                    # check the config for auto post to Bloomberg
+                            # check the config for auto post to Bloomberg
+                            if str(accountId) in config.get(parser_type, 'auto_post_to_BBG_account_list'):
+                                logger.debug(
+                                    'Auto Release to Trade Support is set to True for account - %s' % accountId)
+                                params = []
+                                params.append(row[0])
+                                params.append('BATCH')
+                                DBUtils.callStoredProc(config, 'cash_flow_release_to_trading_support', params)
 
                 # set file status to success to archive the file.
                 file_success = True
@@ -140,14 +171,14 @@ class SubAdvisedProcessor:
                 # rename the original file and append with timestamp for archiving purposes
                 modifiedTime = os.path.getmtime(filename)
                 timeStamp = datetime.fromtimestamp(modifiedTime).strftime("%Y%m%d_%H%M%S")
-                os.rename(filename, filename + "_" + timeStamp)
+                #os.rename(filename, filename + "_" + timeStamp)
                 if file_success:
                     archive_filename = os.path.join(dir, '../data/archive/' + file_name + "_" + timeStamp)
-                    shutil.move(filename + "_" + timeStamp, archive_filename)
+                    #shutil.move(filename + "_" + timeStamp, archive_filename)
                     logger.debug("File moved to archive folder - %s" % archive_filename)
                 else:
                     error_filename = os.path.join(dir, '../data/error/' + file_name + "_" + timeStamp)
-                    shutil.move(filename + "_" + timeStamp, error_filename)
+                    #shutil.move(filename + "_" + timeStamp, error_filename)
                     logger.error("Error File moved to error folder - %s" % error_filename)
                 logger.info('Done archiving the output file')
                 logger.debug('#' * 50)

@@ -12,8 +12,8 @@ class BNPParibas(BaseParser):
         file_name = self._file_name
         config = self._config
 
-        bnp_account_mapping = config.get('BNP', 'bnp_account_mapping_json')
-        bnp_column_mapping = ast.literal_eval(config.get('BNP', 'bnp_column_mapping_dict'))
+        bnp_account_mapping = config.get('BNPParibas', 'account_mapping_json')
+        bnp_column_mapping = ast.literal_eval(config.get('BNPParibas', 'column_mapping_dict'))
 
         TRADE_DATE_COLUMN = bnp_column_mapping['posted_date']
         SETTLEMENT_DATE_COLUMN = bnp_column_mapping['settlement_date']
