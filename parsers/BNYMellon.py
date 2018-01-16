@@ -1,4 +1,5 @@
 import csv
+import xlrd
 
 from parsers.BaseParser import *
 
@@ -12,119 +13,98 @@ class BNYMellon(BaseParser):
         file_name = self._file_name
         config = self._config
 
-        bnp_account_mapping = config.get('BNYMellon', 'account_mapping_json')
-        bnp_column_mapping = ast.literal_eval(config.get('BNYMellon', 'column_mapping_dict'))
+        # json_string = '{"account_mapping": [{"acronym": "PACFUNSG","accountId": "983","custodianId": "Fund Number : PF02"},{"acronym": "MIGMCF","accountId": "532","custodianId":"Fund Number : 890204E"},{"acronym": "MIGSEF","accountId": "531","custodianId": "Fund Number : 890025E"},{"acronym": "PRUCO","accountId": "840","custodianId": "PDBS AST LORD ABBETT FIXED INC PORT"}],   "data_points":[{"sheet":0, "row_data":"NET CAPITAL STOCK", "crs_purpose_code": 51,"cash_flow_type": 1001,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data":"EXPENSES","crs_purpose_code": 54,"cash_flow_type": 1002,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data":"Net Fundshare Activity", "crs_purpose_code": 51,"cash_flow_type": 1001,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data": "Date"},{"sheet":0, "row_data":"Currency"}],   "auto_approve_account_list": [],   "auto_post_to_SCD_account_list": [],   "auto_post_to_BBG_account_list": []}'
+        custodian_list = self.find_values('custodianId', config.get('BNYMellon', 'account_mapping'))
+        data_points_json = config.get('BNYMellon', 'data_points')
+        data_points = ast.literal_eval(data_points_json)
+        data_points_row_data = self.find_values('row_data', data_points_json)
 
-        TRADE_DATE_COLUMN = bnp_column_mapping['posted_date']
-        SETTLEMENT_DATE_COLUMN = bnp_column_mapping['settlement_date']
-        CASH_FLOW_AMOUNT_COLUMN = bnp_column_mapping['cash_flow_amount']
-        CURRENCY_CODE_COLUMN = bnp_column_mapping['currency_code']
-        ACCOUNT_COLUMN = bnp_column_mapping['account']
-
-        '''
-        json_string='{"account_mapping":[{"acronym":"PACFUNSG","accountId":"983","custodianId":"Fund Number : PF02"},{"acronym":"MIGMCF","accountId":"532","custodianId":"Fund Number : 890204E"},{"acronym":"MIGSEF","accountId":"531","custodianId":"Fund Number : 890025E"},{"acronym":"PRUCO","accountId":"840","custodianId":"PDBS AST LORD ABBETT FIXED INC PORT"}],"data_points":[{"sheet":0, "row_data":"NET CAPITAL STOCK"},{"sheet":0, "row_data":"EXPENSES"}, {"sheet":0, "row_data":"Net Fundshare Activity"}]}'
-params = json.loads(json_string)
-custodian_list = find_values('custodianId', json_string)
-data_points = find_values('row_data', json_string)
-print(data_points)
-found_custodian = False
-account_id = None
-
-book = xlrd.open_workbook('c:/temp/PF02_PF Developing Growth Fund.xls')
-#book = xlrd.open_workbook('c:/temp/PDBS.xls')
-for sheet in book.sheets():
-    #sheet = book.sheet_by_index(i)
-    for i in range(sheet.nrows):
-        row = sheet.row_values(i)
-        if found_custodian == False:
-            check_Cust = [e for e in custodian_list if  e in row]
-            if len(check_Cust) > 0:
-                found_custodian = True
-                account_id = [account['accountId'] for  account in params['account_mapping'] if account['custodianId'] == check_Cust[0]]
-                logger.debug('Custodian Account row - %s' %row)
-                logger.debug('Account Id - %s'%account_id[0])
-
-        if 'Date:' in str(row):
-            print(row)
-
-        check_data = [e for e in data_points if e in row]
-        if len(check_data) > 0 :
-            sheet_number = [sh['sheet'] for sh in params['data_points'] if sh['row_data'] == check_data[0]]
-            if sheet.number == sheet_number[0]:
-                logger.debug('Data row - %s'%row)
-                for cell in row:
-                    if is_number(cell):
-                        amount = float(cell)
-                        print(amount)
-                continue
-
-        
-        
-        We are parsing the file in columnar data. 
-        Advantages is that now the mapping is based on columns headers and not column positions. 
-        '''
-        logger.info('BNPParibas parser - Parse fileName - %s' % file_name)
-        columnar_data = {}
-        rolled_up_rec = {}
+        found_custodian = False
+        account_id = None
+        settlement_date = None
+        currency = 'USD'
         cash_flow_records = []
 
-        with open(file_name, newline='') as f:
-            reader = csv.reader((row.replace('\x00', '') for row in f), delimiter="\t")
-            headers = next(reader)
-            for h in headers:
-                columnar_data[h] = []
-            for row in reader:
-                for h, v in zip(headers, row):
-                    columnar_data[h].append(v)
+        book = xlrd.open_workbook(file_name)
+        for sheet in book.sheets():
+            for i in range(sheet.nrows):
+                row = sheet.row_values(i)
+                check_data = None
+                read_cell = False
 
-        # build record for rows only where there is a valid trade date
-        for i in range(0, len(columnar_data['Trade date'])):
-            if len(columnar_data[TRADE_DATE_COLUMN][i].rstrip()) > 0:
+                if found_custodian == False:
+                    check_Cust = [e for e in custodian_list if e in row]
+                    if len(check_Cust) > 0:
+                        found_custodian = True
+                        account_id = [account['accountId'] for account in
+                                      json.loads(config.get('BNYMellon', 'account_mapping')) if
+                                      account['custodianId'] == check_Cust[0]]
+                        logger.debug('Custodian Account row - %s' % row)
+                        logger.debug('Account Id - %s' % account_id[0])
 
-                # unique record key is a combination of <posted_date> - <settlement date> - <isin> - <currency>
-                trade_date = datetime.strptime(columnar_data[TRADE_DATE_COLUMN][i], '%d/%m/%Y').strftime('%Y%m%d')
-                settlement_date = datetime.strptime(columnar_data[SETTLEMENT_DATE_COLUMN][i], '%d/%m/%Y').strftime(
-                    '%Y%m%d')
-                account_code = columnar_data[ACCOUNT_COLUMN][i]
-                # Find the CRS account id based on the account mapping list
-                for item in json.loads(bnp_account_mapping):
-                    if account_code in item['isin']:
-                        account_code = item['accountId']  # item.get('accountId')
-                        break
+                data_list = [e for e in data_points_row_data if e in str(row)]
+                for data in data_list:
+                    sheet_number = [sh['sheet'] for sh in json.loads(data_points_json) if sh['row_data'] == data]
+                    if sheet.number == sheet_number[0]:
+                        logger.debug('Data row - %s' % row)
+                        for cell in row:
+                            # capture values in the cell that occur after the data cell
+                            if str(data) in str(cell):
+                                read_cell = True
 
-                currency = columnar_data[CURRENCY_CODE_COLUMN][i]
-                amount = float(
-                    columnar_data[CASH_FLOW_AMOUNT_COLUMN][i].replace(',', '').replace('(', '').replace(')', ''))
+                            if read_cell:
+                                # get the report date
+                                if 'date'.lower() in str(cell).lower():
+                                    # if date is part of the same cell then get the date
+                                    settlement_date = cell.split(':')[1].strip()
+                                    if len(settlement_date) > 0:
+                                        settlement_date = datetime.strptime(settlement_date, '%m/%d/%Y').strftime(
+                                            '%Y%m%d')
+                                    continue
+                                elif 'currency' in str(cell).lower():
+                                    # find the reporting currency
+                                    if len(cell.split(':')) > 1:
+                                        currency = cell.split(':')[1].strip()
+                                    continue
 
-                key = '_'.join((str(trade_date), str(settlement_date), str(account_code), currency))
-                if key in rolled_up_rec:
-                    cash_flow_rec = rolled_up_rec[key]
-                    temp = amount + cash_flow_rec.cash_flow_amount
-                    cash_flow_rec.cash_flow_amount = temp
-                    rolled_up_rec[key] = cash_flow_rec
-                else:
-                    cash_flow_rec = CashFlow()
-                    cash_flow_rec.trade_date = trade_date
-                    cash_flow_rec.settlement_date = settlement_date
-                    cash_flow_rec.account_id = account_code
-                    cash_flow_rec.currency_code = self._iso_currency_map[currency][1]
-                    cash_flow_rec.cash_flow_amount = amount
-                    rolled_up_rec[key] = cash_flow_rec
+                                '''
+                                if BaseParser.is_date(str(cell)):
+                                    settlement_date = datetime.strptime(str(cell), '%m/%d/%Y').strftime('%Y%m%d')
+                                    continue
+                                '''
 
-        # Update additional parameters for the rolled up totals and add it to the list
-        for key, rec in rolled_up_rec.items():
-            # set the purpose code .. currently BNP is sending only contributions and withdrawals
-            rec.purpose_code = 51  # CRS purpose code for CAPSTOCK
+                                if BaseParser.is_number(cell):
+                                    try:
+                                        amount = float(cell)
+                                        if abs(amount) > 0:
+                                            cash_rec = CashFlow()
+                                            crs_purpose_code = \
+                                            [row['crs_purpose_code'] for row in data_points if row['row_data'] == data][
+                                                0]
+                                            if amount >= 0:
+                                                cash_rec.cash_flow_type = \
+                                                [row['cash_flow_type'] for row in data_points if
+                                                 row['row_data'] == data][0]
+                                                cash_rec.cash_flow_amount = amount
+                                            elif amount < 0:
+                                                cash_rec.cash_flow_type = \
+                                                [row['cash_flow_type_negative'] for row in data_points if
+                                                 row['row_data'] == data][0]
+                                                cash_rec.cash_flow_amount = amount * -1
 
-            # set the CASH FLOW TYPE ( Contribution or Withdrawal) based on positive or negative amount
-            if rec.cash_flow_amount >= 0:
-                rec.cash_flow_type = 1001
-            else:
-                rec.cash_flow_type = 1002
-                rec.cash_flow_amount = amount * -1
+                                            cash_rec.settlement_date = settlement_date
+                                            cash_rec.account_id = account_id[0]
+                                            cash_rec.trade_date = settlement_date
+                                            cash_rec.purpose_code = crs_purpose_code
+                                            cash_rec.currency_code = self._iso_currency_map.get(currency, ('USD', 4))[
+                                                1]  # default the currency code to USD
+                                            cash_rec.cash_flow_comments = data
+                                            cash_rec.cash_flow_status = 10
 
-            rec.cash_flow_status = 20  # this is the Approved status code of Entered
-            cash_flow_records.append(rec)
+                                            cash_flow_records.append(cash_rec)
+                                    except KeyError as ke:
+                                        logging.exception(ke)
+                                        pass
 
         logger.info('BNP parser - Parse records - %s' % ''.join(str(rec) for rec in cash_flow_records))
         return cash_flow_records
