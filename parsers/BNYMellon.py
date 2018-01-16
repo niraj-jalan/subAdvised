@@ -13,7 +13,6 @@ class BNYMellon(BaseParser):
         file_name = self._file_name
         config = self._config
 
-        # json_string = '{"account_mapping": [{"acronym": "PACFUNSG","accountId": "983","custodianId": "Fund Number : PF02"},{"acronym": "MIGMCF","accountId": "532","custodianId":"Fund Number : 890204E"},{"acronym": "MIGSEF","accountId": "531","custodianId": "Fund Number : 890025E"},{"acronym": "PRUCO","accountId": "840","custodianId": "PDBS AST LORD ABBETT FIXED INC PORT"}],   "data_points":[{"sheet":0, "row_data":"NET CAPITAL STOCK", "crs_purpose_code": 51,"cash_flow_type": 1001,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data":"EXPENSES","crs_purpose_code": 54,"cash_flow_type": 1002,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data":"Net Fundshare Activity", "crs_purpose_code": 51,"cash_flow_type": 1001,"cash_flow_type_negative": 1002},   {"sheet":0, "row_data": "Date"},{"sheet":0, "row_data":"Currency"}],   "auto_approve_account_list": [],   "auto_post_to_SCD_account_list": [],   "auto_post_to_BBG_account_list": []}'
         custodian_list = self.find_values('custodianId', config.get('BNYMellon', 'account_mapping'))
         data_points_json = config.get('BNYMellon', 'data_points')
         data_points = ast.literal_eval(data_points_json)
