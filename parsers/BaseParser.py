@@ -1,4 +1,5 @@
 from datetime import datetime
+
 import ast
 import logging
 import logging.config
@@ -64,3 +65,36 @@ class BaseParser(ABC):
 
         json.loads(json_repr, object_hook=_decode_dict)  # Return value ignored.
         return results
+
+    '''
+    # need to re-evaluate this function for accuracy. 
+    def is_date(s):
+        try:
+            from dateutil.parser import parse
+            parse(s)
+            return True
+        except ValueError:
+            pass
+
+        return False
+    '''
+
+    def is_number(s):
+        '''
+        Utility function to check if the passed string is a number
+        :return: True or False
+        '''
+        try:
+            float(s)
+            return True
+        except ValueError:
+            pass
+
+        try:
+            import unicodedata
+            unicodedata.numeric(s)
+            return True
+        except (TypeError, ValueError):
+            pass
+
+        return False
