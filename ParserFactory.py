@@ -1,5 +1,6 @@
 from parsers.SSBParser import *
 from parsers.BNPParibas import *
+from parsers.BNYMellon import *
 
 from abc import ABC
 
@@ -17,5 +18,7 @@ class ParserFactory(ABC):
             parser = SSBParser(config)
         elif type == 'BNPParibas':
             parser = BNPParibas(config)
+        elif type == 'BNYMellon':
+            parser = BNYMellon(config)
 
         return parser
