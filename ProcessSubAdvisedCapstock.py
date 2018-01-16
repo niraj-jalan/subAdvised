@@ -93,7 +93,7 @@ class SubAdvisedProcessor:
         params.append(parser_type)
         json_string = DBUtils.select(config, 'get_parser_config', params, False)[0]
         for k, v in json.loads(json_string).items():
-            logger.debug('JSN String parsed Properties from Database - %s - %s' % (k, v))
+            logger.debug('JSON String parsed Properties from Database - %s - %s' % (k, v))
             config.set(parser_type, str(k), str(v).replace('\'', '"'))
 
         return_code = 0
@@ -127,26 +127,20 @@ class SubAdvisedProcessor:
                             rows_inserted) > 0:
                         logger.debug('Auto Approve is set to True for account - %s' % accountId)
                         for row in rows_inserted:
-                            params = []
-                            params.append(row[0])
-                            params.append('BATCH')
+                            params = [row[0], 'BATCH']
                             DBUtils.callStoredProc(config, 'cash_flow_update_status', params)
 
                             # check the config for auto post to SCD
                             if str(accountId) in config.get(parser_type, 'auto_post_to_SCD_account_list'):
                                 logger.debug('Auto Post is set to True for account - %s' % accountId)
-                                params = []
-                                params.append(row[0])
-                                params.append('20')
+                                params = [row[0], '20']
                                 DBUtils.callStoredProc(config, 'cash_flow_update_scd_status', params)
 
                             # check the config for auto post to Bloomberg
                             if str(accountId) in config.get(parser_type, 'auto_post_to_BBG_account_list'):
                                 logger.debug(
                                     'Auto Release to Trade Support is set to True for account - %s' % accountId)
-                                params = []
-                                params.append(row[0])
-                                params.append('BATCH')
+                                params = [row[0], 'BATCH']
                                 DBUtils.callStoredProc(config, 'cash_flow_release_to_trading_support', params)
 
                 # set file status to success to archive the file.
@@ -171,14 +165,14 @@ class SubAdvisedProcessor:
                 # rename the original file and append with timestamp for archiving purposes
                 modifiedTime = os.path.getmtime(filename)
                 timeStamp = datetime.fromtimestamp(modifiedTime).strftime("%Y%m%d_%H%M%S")
-                #os.rename(filename, filename + "_" + timeStamp)
+                os.rename(filename, filename + "_" + timeStamp)
                 if file_success:
                     archive_filename = os.path.join(dir, '../data/archive/' + file_name + "_" + timeStamp)
-                    #shutil.move(filename + "_" + timeStamp, archive_filename)
+                    shutil.move(filename + "_" + timeStamp, archive_filename)
                     logger.debug("File moved to archive folder - %s" % archive_filename)
                 else:
                     error_filename = os.path.join(dir, '../data/error/' + file_name + "_" + timeStamp)
-                    #shutil.move(filename + "_" + timeStamp, error_filename)
+                    shutil.move(filename + "_" + timeStamp, error_filename)
                     logger.error("Error File moved to error folder - %s" % error_filename)
                 logger.info('Done archiving the output file')
                 logger.debug('#' * 50)
