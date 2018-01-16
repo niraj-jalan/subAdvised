@@ -1,1 +1,1 @@
-__all__ = ["BaseParser", "SSBParser", "BNPParibas"]
+__all__ = ["BaseParser", "SSBParser", "BNPParibas", "BNYMellon"]
