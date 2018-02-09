@@ -59,6 +59,13 @@ class BNYMellon(BaseParser):
                                     if len(settlement_date) > 0:
                                         settlement_date = datetime.strptime(settlement_date, '%m/%d/%Y').strftime(
                                             '%Y%m%d')
+
+                                        if settlement_date != config.get('APP', 'process_date'):
+                                            logger.error('-' * 50)
+                                            logger.error('Report Date does not match processing date')
+                                            logger.error('-' * 50)
+                                            raise Exception('Report Date does not match processing date')
+
                                     continue
                                 elif 'currency' in str(cell).lower():
                                     # find the reporting currency
