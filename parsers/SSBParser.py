@@ -37,6 +37,12 @@ class SSBParser(BaseParser):
             # report_date = datetime.strptime(match.group(), '%d-%b-%Y').date()
             report_date = datetime.strptime(match.group(), '%d-%b-%Y').strftime('%Y%m%d')
 
+            if report_date != config.get('APP', 'process_date'):
+                logger.error('-' * 50)
+                logger.error('Report Date does not match processing date')
+                logger.error('-' * 50)
+                raise Exception('Report Date does not match processing date')
+
             # line 3 has the custodian account code for the account
             custodian_account_code = lines[3].rstrip()
 
