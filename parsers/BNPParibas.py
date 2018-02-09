@@ -45,6 +45,14 @@ class BNPParibas(BaseParser):
 
                 # unique record key is a combination of <posted_date> - <settlement date> - <isin> - <currency>
                 trade_date = datetime.strptime(columnar_data[TRADE_DATE_COLUMN][i], '%d/%m/%Y').strftime('%Y%m%d')
+                if datetime.strptime(trade_date, '%Y%m%d') < datetime.strptime(config.get('APP', 'process_date'),
+                                                                               '%Y%m%d'):
+                    logger.error('-' * 50)
+                    logger.error(
+                        'Trade Date is less than processing date. Check the records in the input file. Continuing with the next record')
+                    logger.error('-' * 50)
+                    continue
+
                 settlement_date = datetime.strptime(columnar_data[SETTLEMENT_DATE_COLUMN][i], '%d/%m/%Y').strftime(
                     '%Y%m%d')
                 account_code = columnar_data[ACCOUNT_COLUMN][i]
