@@ -267,7 +267,7 @@ class DBUtils:
             ret_code = int(cursor.execute(sql, sqlParams).fetchone()[0])
 
             conn.commit()
-            logger.info('DBUtils.callStoredProc statement - re_code %s' % ret_code)
+            logger.info('DBUtils.callStoredProc statement - ret_code %s' % ret_code)
 
         except pypyodbc.DatabaseError as err:
             # error, = err.args
